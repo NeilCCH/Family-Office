@@ -1,6 +1,6 @@
 # 家族辦公室 AI 團隊 — 安裝與使用總說明
 
-這是一組 Claude Code 子代理（subagents），組成一個「家族辦公室 AI 團隊」，協助高淨值家族的財富傳承規劃。共 8 個檔：1 位對話前台、1 位調度總管、6 位專業成員。
+這是一組 Claude Code 子代理（subagents），組成一個「家族辦公室 AI 團隊」，協助高淨值家族的財富傳承規劃。共 7 個檔：**1 位 AI 顧問（唯一對話入口，同時身兼前台與調度）**、6 位專業成員。
 
 ---
 
@@ -8,8 +8,7 @@
 
 | 檔名 | 成員 | 角色 | 建議模型 |
 |---|---|---|---|
-| `family-office-concierge.md` | 對話總管（前台顧問） | 對話式入口：開場、逐步問、確認、分派 | opus |
-| `family-office-director.md` | 家辦總管（調度） | 接需求、拆任務、分派、整合報告（內部調度層） | opus |
+| `family-office-concierge.md` | **AI 顧問（唯一入口）** | 使用者只跟他對話：開場、逐步問、確認摘要，內部自行判斷調度哪些專業成員、依什麼順序、如何整合結果 | opus |
 | `tax-law-research-officer.md` | 稅法法規官 | 遺贈稅、AMT、實質課稅、CFC/CRS 檢索與初判 | opus |
 | `insurance-tax-source-planner.md` | 保單／稅源試算官 | 遺產稅試算、稅源缺口、保單架構 | opus |
 | `succession-structuring-officer.md` | 傳承架構規劃官 | 信託、控股公司、遺囑、贈與、整體架構 | opus |
@@ -17,7 +16,7 @@
 | `client-proposal-generator.md` | 客戶提案生成官 | 把分析轉成客戶簡報／提案 | sonnet |
 | `family-meeting-scribe.md` | 家族會議／文件官 | 會議記錄、家族憲章、文件庫 | sonnet |
 
-> **入口二擇一**：`family-office-concierge`（對話前台，面向人、負責一問一答）與 `family-office-director`（調度總管，偏內部任務拆解）角色相近。想要對話感就用前台當入口；若覺得重疊，可只留一個，或請 Claude 幫你合併成一隻。真正的專業顧問是下面 6 位。
+> **只有一個入口**：使用者永遠只跟 `family-office-concierge`（AI 顧問）對話，不需要知道、也不需要記得背後有哪 6 位專業成員。原本分開的「對話前台」與「調度總管」已合併成這一位——它對外是一個溫暖有耐心的顧問人格，對內同時具備調度大腦，會自己判斷該找誰、依什麼順序、怎麼整合成一份回覆。真正做專業判斷的是下面 6 位，但使用者不用直接跟他們打交道。
 
 ---
 
@@ -34,8 +33,7 @@ Claude Code 的子代理放在 `.claude/agents/` 資料夾。兩種放法：
 你的專案/
 └── .claude/
     └── agents/
-        ├── family-office-concierge.md
-        ├── family-office-director.md
+        ├── family-office-concierge.md   ← 唯一入口
         ├── tax-law-research-officer.md
         ├── insurance-tax-source-planner.md
         ├── succession-structuring-officer.md
@@ -44,18 +42,15 @@ Claude Code 的子代理放在 `.claude/agents/` 資料夾。兩種放法：
         └── family-meeting-scribe.md
 ```
 
-把 `agents/` 資料夾裡這 8 個 `.md` 檔全部放進去即可，不需改任何程式。（本壓縮包已用相同結構整理，解壓後直接把 `agents` 資料夾內容複製過去。）
+把 `agents/` 資料夾裡這 7 個 `.md` 檔全部放進去即可，不需改任何程式。
 
 ---
 
 ## 三、怎麼呼叫
 
-1. **自動分派**：在 Claude Code 對話中描述需求，主代理會依每個檔案的 `description` 自動選用合適成員。
-   例：「幫我算這個家族的遺產稅與稅源缺口」→ 會叫用「保單／稅源試算官」。
+**只有一種方式：找 AI 顧問（`family-office-concierge`）就對了。** 不用判斷該找誰、不用指定成員，直接把需求講給它聽，它會自己一步步問清楚，再到背後調度對的專業成員、整合成一份回覆給你。
 
-2. **指定成員**：直接點名，例如「用傳承架構規劃官，幫這個家族比較信託 vs 控股公司兩種移轉方式」。
-
-3. **完整規劃走總管**：需要跨多位成員的完整案子，說「用家辦總管，幫某家族做一份完整傳承規劃」，總管會依序調度稅法官 → 稅源試算官 → 架構官 → 提案官並整合。
+例：「幫我算這個家族的遺產稅與稅源缺口」「幫某家族做一份完整傳承規劃」「用傳承架構規劃官比較信託 vs 控股公司」——不管是單一小問題還是跨多位成員的完整案子，都跟同一位 AI 顧問說就好，它會自己判斷怎麼拆、怎麼串。
 
 ---
 
