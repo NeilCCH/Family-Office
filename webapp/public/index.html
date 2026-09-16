@@ -1,0 +1,1867 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>AEGIS FO AI</title>
+<link rel="icon" href="icon-192.png" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#070a10" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="AEGIS" />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;700&family=Baloo+2:wght@700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root{
+    --bg:#070a10;
+    --bg-2:#0b1119;
+    --panel:rgba(15,23,32,.78);
+    --panel-solid:#101923;
+    --line:#1c2b38;
+    --line-bright:#2c4657;
+    --accent:#4be3da;
+    --accent-rgb:75,227,218;
+    --accent-soft:rgba(75,227,218,.14);
+    --accent-2:#d8ab63;
+    --accent-2-rgb:216,171,99;
+    --danger:#e2795a;
+    --danger-rgb:226,121,90;
+    --danger-soft:rgba(226,121,90,.14);
+    --warn-rgb:226,121,90;
+    --text:#dfeaf1;
+    --text-dim:#82a0b0;
+    --text-faint:#4c6273;
+    --font-display:'Orbitron','Noto Sans TC',sans-serif;
+    --font-body:'Noto Sans TC',sans-serif;
+    --font-mono:'JetBrains Mono',ui-monospace,monospace;
+    /* left-zone's own on-screen width (used for its flex-basis and, via
+       container queries on .core-radar-row, for sizing the AEGIS core/radar
+       circles proportionally — see .core-radar-row below). */
+    --lzw:clamp(430px, 56vw, 668px);
+  }
+
+  *{box-sizing:border-box;}
+  html{color-scheme:dark;}
+  body{
+    margin:0;
+    min-height:100vh;
+    background:
+      radial-gradient(ellipse 70% 55% at 20% 15%, rgba(var(--accent-rgb),.10), transparent 60%),
+      radial-gradient(ellipse 70% 50% at 90% 110%, rgba(var(--accent-2-rgb),.06), transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--font-body);
+    font-size:15px;
+    line-height:1.6;
+    position:relative;
+    overflow-x:hidden;
+  }
+  body::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    z-index:0;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(var(--accent-rgb),.05) 0 1px, transparent 1px 64px),
+      repeating-linear-gradient(90deg, rgba(var(--accent-rgb),.05) 0 1px, transparent 1px 64px);
+    mask-image:radial-gradient(ellipse 80% 70% at 20% 15%, #000 0%, transparent 75%);
+  }
+
+  @keyframes spinCW{to{transform:rotate(360deg);}}
+  @keyframes spinCCW{to{transform:rotate(-360deg);}}
+  @keyframes dotPulse{0%,100%{opacity:.55;transform:scale(1);}50%{opacity:1;transform:scale(1.4);}}
+  @keyframes discBreathe{0%,100%{box-shadow:0 0 46px 10px rgba(var(--accent-rgb),.22);}50%{box-shadow:0 0 64px 15px rgba(var(--accent-rgb),.38);}}
+  @keyframes corePulse{
+    0%,100%{transform:scale(1);opacity:.85;}
+    50%{transform:scale(1.3);opacity:1;}
+  }
+
+  .app{
+    position:relative;
+    z-index:1;
+    max-width:1560px;
+    margin:0 auto;
+    padding:20px 16px 32px;
+    min-height:100vh;
+  }
+
+  @media (min-width:901px){
+    html, body{height:100%;}
+    .app{height:100vh;display:flex;flex-direction:column;box-sizing:border-box;}
+    .console{flex:1;min-height:0;}
+    .left-zone{align-self:stretch;overflow-y:auto;overflow-x:hidden;max-height:100%;}
+    .chat-panel{max-height:100%;}
+  }
+
+  /* ================= mobile-only header / strip ================= */
+  .mobile-header{
+    display:none;
+    align-items:center;gap:10px;
+    padding:14px 4px;border-bottom:1px solid var(--line);margin-bottom:10px;
+  }
+  .mobile-header .orb{width:30px;height:30px;border-radius:50%;border:1.5px solid rgba(var(--accent-rgb),.75);display:grid;place-items:center;flex:none;}
+  .mobile-header .orb svg{width:16px;height:16px;}
+  .mobile-title-wrap{flex:1;}
+  .mobile-title{font-family:var(--font-display);font-weight:700;font-size:15px;letter-spacing:.1em;}
+  .mobile-subtitle{font-family:var(--font-mono);font-size:9px;color:var(--text-faint);margin-top:1px;}
+  .mobile-status-pill{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.03em;color:var(--text-dim);
+    border:1px solid var(--line-bright);border-radius:14px;padding:5px 10px;}
+
+  .mobile-strip{
+    display:none;gap:8px;padding:4px 2px 14px;overflow-x:auto;
+  }
+  .mobile-chip{
+    flex:none;font-family:var(--font-mono);font-size:10px;color:var(--text-dim);background:var(--panel-solid);
+    border:1px solid var(--line-bright);border-radius:14px;padding:6px 11px;white-space:nowrap;
+  }
+  .mobile-chip.used{color:var(--dot-color,var(--accent));border-color:rgba(var(--dot-rgb,var(--accent-rgb)),.5);}
+
+  /* ================= layout ================= */
+  .console{
+    display:flex;
+    gap:16px;
+    flex-wrap:nowrap;
+    align-items:stretch;
+  }
+
+  /* ---------- left zone: HUD dashboard ---------- */
+  .left-zone{
+    flex:0 0 var(--lzw);
+    max-width:668px;
+    position:relative;
+    border:1px solid var(--line);
+    border-radius:4px;
+    background:var(--panel);
+    backdrop-filter:blur(6px);
+    padding:clamp(14px,2.4vh,26px) 20px clamp(12px,2vh,20px);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:clamp(9px,1.6vh,16px);
+    overflow:hidden;
+    /* Always-visible thin scrollbar (not an auto-hiding overlay one) so that
+       when a short window makes this panel scroll, it visibly reads as
+       "more below, scroll" rather than "content got cut off". */
+    scrollbar-width:thin;
+    scrollbar-color:rgba(var(--accent-rgb),.4) transparent;
+  }
+  .left-zone::-webkit-scrollbar{width:6px;}
+  .left-zone::-webkit-scrollbar-track{background:transparent;}
+  .left-zone::-webkit-scrollbar-thumb{background:rgba(var(--accent-rgb),.35);border-radius:3px;}
+  .left-zone::-webkit-scrollbar-thumb:hover{background:rgba(var(--accent-rgb),.55);}
+  .n-watermark{position:absolute;left:8%;top:6%;width:84%;height:88%;opacity:.06;pointer-events:none;z-index:0;}
+
+  .corner{position:absolute;width:16px;height:16px;pointer-events:none;opacity:.8;z-index:2;}
+  .corner.tl{top:-1px;left:-1px;border-top:2px solid var(--accent);border-left:2px solid var(--accent);}
+  .corner.br{bottom:-1px;right:-1px;border-bottom:2px solid var(--accent);border-right:2px solid var(--accent);}
+
+  /* ---- AEGIS core ----
+     core-radar-row is flex:1 inside .left-zone's column, so it always fills
+     whatever vertical space is left over after the other rows (dials, module
+     list, cards, banner) take their natural height — no guessed vw/vh numbers,
+     no manual per-resolution breakpoints. container-type:size makes it a query
+     container, so its own children can size themselves as a % of ITS real
+     rendered box (cqw/cqh) instead of the viewport. .core-wrap/.radar-wrap then
+     take min(44cqw, 90cqh) — whichever axis is tighter — so they always fit both
+     dimensions of whatever space actually exists, on any screen or window size.
+     --cs is a single "core scale" unit (≈ core-wrap width × 0.182); every inner
+     ring/bracket/text is a multiple of --cs so the glyph re-scales as one piece. */
+  .core-radar-row{
+    position:relative;z-index:1;display:flex;align-items:center;justify-content:center;gap:18px;width:100%;
+    flex:1 1 auto;min-height:150px;
+    container-type:size;container-name:cradar;
+  }
+  .core-wrap{
+    position:relative;z-index:1;
+    width:min(44cqw, 90cqh);aspect-ratio:1;
+    --cs:clamp(24px, calc(min(44cqw, 90cqh) * .182), 80px);
+    display:grid;place-items:center;flex:none;
+  }
+  .tick-major{position:absolute;inset:calc(var(--cs) * .1);border-radius:50%;
+    background:repeating-conic-gradient(rgba(var(--accent-rgb),.9) 0deg 1.6deg, transparent 1.6deg 30deg);
+    -webkit-mask-image:radial-gradient(circle, transparent 0 84%, #000 85% 100%);
+    mask-image:radial-gradient(circle, transparent 0 84%, #000 85% 100%);
+    animation:spinCW 46s linear infinite;}
+  .tick-minor{position:absolute;inset:calc(var(--cs) * .1);border-radius:50%;
+    background:repeating-conic-gradient(rgba(var(--accent-rgb),.45) 0deg .8deg, transparent .8deg 10deg);
+    -webkit-mask-image:radial-gradient(circle, transparent 0 91%, #000 92% 100%);
+    mask-image:radial-gradient(circle, transparent 0 91%, #000 92% 100%);
+    animation:spinCCW 30s linear infinite;}
+  .core-ring{position:absolute;border-radius:50%;border:1px solid rgba(var(--accent-rgb),.35);}
+  .core-ring.r1{inset:0;animation:spinCCW 70s linear infinite;}
+  .core-ring.r2{inset:calc(var(--cs) * .375);border-color:rgba(var(--accent-rgb),.55);border-style:dashed;animation:spinCW 24s linear infinite;}
+  .core-ring.r3{inset:calc(var(--cs) * .8);border-color:rgba(var(--accent-rgb),.8);}
+  .core-arc{position:absolute;inset:0;filter:drop-shadow(0 0 5px rgba(255,255,255,.85));
+    animation:spinCW 14s linear infinite;transform-origin:50% 50%;}
+  .bracket-top{position:absolute;left:50%;top:calc(var(--cs) * .3);transform:translateX(-50%);width:calc(var(--cs) * 2.4);height:calc(var(--cs) * .4);}
+  .bracket-bottom{position:absolute;left:50%;bottom:calc(var(--cs) * .3);transform:translateX(-50%) scaleY(-1);width:calc(var(--cs) * 2.4);height:calc(var(--cs) * .4);}
+  .core-disc{
+    position:absolute;inset:calc(var(--cs) * 1.35);border-radius:50%;overflow:visible;
+    background:radial-gradient(circle at 50% 40%, rgba(var(--accent-rgb),.4), rgba(var(--accent-rgb),.06) 60%, transparent 75%);
+    border:1px solid rgba(var(--accent-rgb),.65);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    animation:discBreathe 4s ease-in-out infinite;
+  }
+  .core-bg-n-mask{position:absolute;inset:0;border-radius:50%;overflow:hidden;}
+  .core-bg-n{position:absolute;inset:calc(var(--cs) * .15);opacity:.34;}
+  .core-name{position:relative;z-index:2;font-family:var(--font-display);font-weight:900;font-size:var(--cs);letter-spacing:.07em;
+    padding-left:.07em;white-space:nowrap;color:#ffffff;text-shadow:0 0 12px rgba(255,255,255,.9), 0 0 32px rgba(var(--accent-rgb),.75), 0 0 52px rgba(var(--accent-rgb),.45);}
+  .core-sub{position:relative;z-index:2;margin-top:5px;font-family:'Baloo 2',var(--font-mono);font-weight:700;font-size:calc(var(--cs) * .324);letter-spacing:.05em;color:#bfe4ea;text-align:center;padding:0 8px;}
+
+  #core.thinking .core-arc{animation-duration:2.4s;}
+  #core.speaking .core-arc{animation-duration:.9s;}
+  #core.thinking .tick-major{animation-duration:10s;}
+  #core.speaking .tick-major{animation-duration:4s;}
+  #core.offline{opacity:.4;}
+  #core.offline .tick-major,#core.offline .tick-minor,#core.offline .core-arc,#core.offline .core-ring.r1,#core.offline .core-ring.r2,#core.offline .core-disc{animation-play-state:paused;}
+
+  .status-readout{text-align:center;font-family:var(--font-mono);position:relative;z-index:1;}
+  .status-row{display:flex;align-items:center;justify-content:center;gap:7px;font-size:11px;letter-spacing:.05em;color:var(--text-dim);}
+  .status-row + .status-row{margin-top:5px;}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--text-faint);flex:none;}
+  .dot.on{background:var(--accent);box-shadow:0 0 8px 2px rgba(var(--accent-rgb),.7);}
+  .dot.warn{background:var(--danger);box-shadow:0 0 8px 2px rgba(var(--danger-rgb),.6);}
+  #clock{color:var(--text-faint);}
+
+  /* ---- real session-stat dials ---- (--ds = dial scale unit, same idea as --cs above) */
+  .dials-row{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;gap:14px;width:100%;}
+  .dial{width:clamp(78px,min(11.5vw,11.5vh),118px);aspect-ratio:1;position:relative;border-radius:50%;
+    --ds:clamp(16px, calc(min(11.5vw,11.5vh) * .208), 24.5px);
+    background:conic-gradient(var(--accent) calc(var(--pct)*1%), var(--line-bright) 0);}
+  .dial-inner{position:absolute;inset:calc(var(--ds) * .45);border-radius:50%;background:var(--bg-2);border:1px solid var(--line);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;}
+  .dial-val{font-family:var(--font-display);font-weight:700;font-size:var(--ds);color:var(--text);font-variant-numeric:tabular-nums;}
+  .dial-label{font-family:var(--font-mono);font-size:calc(var(--ds) * .5);color:var(--text-faint);margin-top:2px;text-align:center;}
+
+
+  /* ---- sparkline card ---- */
+  .spark-card{position:relative;z-index:1;width:100%;background:var(--panel-solid);border:1px solid var(--line-bright);border-radius:4px;padding:9px 12px;}
+  .card-title{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.08em;color:var(--text-faint);text-transform:uppercase;margin-bottom:4px;}
+  .spark-delta{font-family:var(--font-display);font-size:16px;color:var(--accent);margin-bottom:6px;font-variant-numeric:tabular-nums;}
+  .spark-svg{display:block;width:100%;height:56px;}
+  .spark-empty{font-family:var(--font-mono);font-size:10px;color:var(--text-faint);padding:14px 0;text-align:center;}
+
+  /* ---- radar (ambient sweep + per-module colored contacts) ---- */
+  .radar-wrap{position:relative;flex:none;width:min(44cqw, 90cqh);aspect-ratio:1;border-radius:50%;
+    background:radial-gradient(circle, rgba(var(--accent-rgb),.08), transparent 70%);
+    border:1px solid rgba(var(--accent-rgb),.4);}
+  .radar-ring{position:absolute;border-radius:50%;border:1px solid rgba(var(--accent-rgb),.22);}
+  .radar-ring.r1{inset:14%;} .radar-ring.r2{inset:32%;} .radar-ring.r3{inset:50%;}
+  .radar-sweep{
+    position:absolute;inset:0;border-radius:50%;
+    background:conic-gradient(from 0deg, rgba(var(--accent-rgb),.35), transparent 26%);
+    -webkit-mask-image:radial-gradient(circle, #000 60%, transparent 61%);
+    mask-image:radial-gradient(circle, #000 60%, transparent 61%);
+    animation:spinCW 5s linear infinite;
+  }
+  .radar-dot{position:absolute;
+    width:calc(var(--r,4px) * 2);height:calc(var(--r,4px) * 2);border-radius:50%;background:var(--text-faint);
+    transform:translate(-50%,-50%);transition:background .3s,box-shadow .4s,width .4s,height .4s;}
+  .radar-dot.lit{background:var(--dot-color,var(--accent));box-shadow:0 0 var(--glow,6px) calc(var(--glow,6px) * .4) rgba(var(--dot-rgb,var(--accent-rgb)),.8);}
+  .radar-dot.active{animation:dotPulse 1.1s ease-in-out infinite;}
+
+
+  .radar-caption{position:relative;z-index:1;margin-top:2px;font-family:var(--font-mono);font-size:8.5px;color:var(--text-faint);letter-spacing:.05em;align-self:flex-start;}
+
+  /* ---- module dispatch grid ---- */
+  .modules-title{position:relative;z-index:1;align-self:flex-start;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.1em;color:var(--text-faint);text-transform:uppercase;}
+  .modules-list{position:relative;z-index:1;list-style:none;margin:0;padding:0;width:100%;display:grid;grid-template-columns:1fr 1fr;gap:5px;}
+  .module-item{display:flex;align-items:center;gap:7px;background:var(--panel-solid);border:1px solid var(--line-bright);border-radius:3px;padding:4px 7px;}
+  .module-badge{
+    flex:none;width:27px;height:23px;display:grid;place-items:center;
+    clip-path:polygon(25% 0%,75% 0%,100% 50%,75% 100%,25% 100%,0% 50%);
+    background:var(--bg-2);border:1px solid var(--line-bright);
+    font-family:var(--font-mono);font-size:8px;letter-spacing:.02em;color:var(--text-faint);
+    transition:border-color .3s,color .3s,box-shadow .3s;
+  }
+  .module-item.used .module-badge{color:var(--dot-color,var(--accent));border-color:var(--dot-color,var(--accent));}
+  .module-item.active .module-badge{color:var(--dot-color,var(--accent));border-color:var(--dot-color,var(--accent));box-shadow:0 0 10px 1px rgba(var(--dot-rgb,var(--accent-rgb)),.5);}
+  .module-name{font-size:9.5px;color:var(--text-dim);line-height:1.25;}
+  .module-item.active .module-name,.module-item.used .module-name{color:var(--text);}
+  .module-status{margin-left:auto;width:5px;height:5px;border-radius:50%;background:var(--text-faint);flex:none;}
+  .module-item.used .module-status{background:var(--dot-color,var(--accent-2));}
+  .module-item.active .module-status{background:var(--dot-color,var(--accent));box-shadow:0 0 8px 2px rgba(var(--dot-rgb,var(--accent-rgb)),.8);}
+
+  /* ---- module-trigger bar chart ---- */
+  .bars-card{position:relative;z-index:1;width:100%;background:var(--panel-solid);border:1px solid var(--line-bright);border-radius:4px;padding:9px 12px;}
+  .bars-row{display:flex;align-items:flex-end;gap:6px;height:38px;margin-top:6px;}
+  .bar{flex:1;min-height:2px;background:linear-gradient(to top, rgba(var(--accent-rgb),.85), rgba(var(--accent-rgb),.25));border-radius:2px 2px 0 0;transition:height .4s ease;}
+  .bars-axis{display:flex;justify-content:space-between;margin-top:5px;font-family:var(--font-mono);font-size:7.5px;color:var(--text-faint);}
+
+  /* ---- compliance banner ---- */
+  .compliance{
+    position:relative;z-index:1;width:100%;border-radius:4px;
+    background:rgba(var(--warn-rgb),.10);border:1px solid rgba(var(--warn-rgb),.5);
+    display:flex;align-items:center;gap:8px;padding:9px 11px;
+  }
+  .compliance svg{width:14px;height:14px;stroke:var(--danger);fill:none;stroke-width:1.8;flex:none;}
+  .compliance span{font-family:var(--font-mono);font-size:10px;color:var(--danger);letter-spacing:.02em;line-height:1.4;}
+
+  @media (max-width:980px){
+    .spark-card,.bars-card{display:none;}
+  }
+
+  /* Shorter windows: the left column keeps everything readable but
+     trims the least-essential widgets first, then falls back to its
+     own scrollbar (never the whole page) for anything still too tall. */
+  @media (min-width:901px) and (max-height:1200px){
+    .left-zone{gap:8px;padding:12px 18px 14px;}
+    .core-radar-row{gap:14px;}
+    .dials-row{gap:11px;}
+    .spark-card{display:none;}
+  }
+  @media (min-width:901px) and (max-height:800px){
+    .bars-card{display:none;}
+  }
+  @media (min-width:901px) and (max-height:700px){
+    .dial{width:clamp(70px,min(9.5vw,9.5vh),100px);--ds:clamp(15px, calc(min(9.5vw,9.5vh) * .208), 21px);}
+  }
+
+  /* ---------- chat panel ---------- */
+  .chat-panel{
+    position:relative;
+    flex:1;min-width:0;
+    border:1px solid var(--line);
+    border-radius:4px;
+    background:var(--panel);
+    backdrop-filter:blur(6px);
+    display:flex;
+    flex-direction:column;
+    min-height:640px;
+    overflow:hidden;
+  }
+
+  .panel-toolbar{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+    padding:12px 20px;
+    border-bottom:1px solid var(--line);
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    letter-spacing:.06em;
+    color:var(--text-faint);
+  }
+  .case-switcher{display:flex;align-items:center;gap:6px;min-width:0;}
+  .case-label{flex:none;color:var(--text-faint);}
+  #caseSelect{
+    flex:1 1 auto;min-width:70px;max-width:220px;
+    background:var(--bg-2);border:1px solid var(--line-bright);border-radius:3px;
+    color:var(--text);font-family:var(--font-body);font-size:12px;
+    padding:5px 6px;
+  }
+  #caseSelect:focus{outline:none;border-color:var(--accent);}
+  .case-icon-btn{
+    flex:none;width:26px;height:26px;display:grid;place-items:center;
+    background:transparent;border:1px solid var(--line-bright);border-radius:3px;
+    color:var(--text-dim);cursor:pointer;font-size:12px;line-height:1;
+    transition:border-color .15s,color .15s;
+  }
+  .case-icon-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .case-icon-btn.danger-armed{border-color:var(--danger);color:var(--danger);}
+  .case-editor{display:flex;align-items:center;gap:6px;flex:1 1 auto;min-width:0;}
+  #caseNameInput{
+    flex:1 1 auto;min-width:80px;max-width:260px;
+    background:var(--bg-2);border:1px solid var(--accent);border-radius:3px;
+    color:var(--text);font-family:var(--font-body);font-size:12px;
+    padding:5px 8px;outline:none;
+  }
+  .toggle{display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none;color:var(--text-dim);font-family:var(--font-body);font-size:12px;}
+  .toggle-track{width:30px;height:16px;border-radius:10px;background:var(--panel-solid);border:1px solid var(--line-bright);position:relative;flex:none;transition:border-color .2s,background .2s;}
+  .toggle-thumb{position:absolute;top:1px;left:1px;width:12px;height:12px;border-radius:50%;background:var(--text-faint);transition:transform .2s,background .2s;}
+  .toggle.on .toggle-track{border-color:var(--accent);background:var(--accent-soft);}
+  .toggle.on .toggle-thumb{transform:translateX(14px);background:var(--accent);box-shadow:0 0 6px 1px rgba(var(--accent-rgb),.7);}
+
+  .messages{
+    flex:1;
+    overflow-y:auto;
+    padding:22px 22px 8px;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+  .msg{display:flex;flex-direction:column;gap:4px;max-width:100%;}
+  .msg.user{align-items:flex-end;}
+  .msg.assistant{align-items:flex-start;}
+  .msg-bubble{
+    border-radius:3px;
+    padding:11px 14px;
+    font-size:14.5px;
+    line-height:1.65;
+    max-width:min(560px,100%);
+    word-wrap:break-word;
+  }
+  .msg.user .msg-bubble{
+    background:rgba(var(--accent-2-rgb),.10);
+    border:1px solid rgba(var(--accent-2-rgb),.35);
+    color:var(--text);
+  }
+  .msg.assistant .msg-bubble{
+    background:var(--panel-solid);
+    border:1px solid var(--line-bright);
+    border-left:2px solid var(--accent);
+    color:var(--text);
+  }
+  .msg.assistant .msg-bubble.pending{color:var(--text-dim);font-family:var(--font-mono);font-size:13px;letter-spacing:.04em;}
+  .msg.assistant .msg-bubble.error{border-left-color:var(--danger);}
+  .msg-meta{
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    letter-spacing:.08em;
+    color:var(--text-faint);
+    text-transform:uppercase;
+  }
+  .msg-attachments{
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    color:var(--text-faint);
+    max-width:min(560px,100%);
+  }
+  .retry-btn{
+    margin-top:8px;
+    font-family:var(--font-mono);
+    font-size:11.5px;
+    letter-spacing:.05em;
+    color:var(--accent);
+    background:transparent;
+    border:1px solid rgba(var(--accent-rgb),.5);
+    border-radius:3px;
+    padding:4px 10px;
+    cursor:pointer;
+    display:block;
+  }
+  .retry-btn:hover{background:var(--accent-soft);}
+
+  /* ---------- composer ---------- */
+  .composer{
+    border-top:1px solid var(--line);
+    padding:14px 20px 16px;
+  }
+  .attachments-row{display:flex;flex-wrap:wrap;gap:8px;}
+  .attachments-row:not(:empty){margin-bottom:10px;}
+  .attachment-chip{
+    display:flex;align-items:center;gap:7px;
+    background:var(--panel-solid);
+    border:1px solid var(--line-bright);
+    border-radius:20px;
+    padding:4px 6px 4px 10px;
+    font-size:11.5px;
+    color:var(--text-dim);
+    max-width:230px;
+  }
+  .attachment-chip.ready{border-color:rgba(var(--accent-rgb),.5);color:var(--text);}
+  .attachment-chip.error{border-color:var(--danger);color:var(--danger);}
+  .attachment-thumb{width:20px;height:20px;border-radius:3px;object-fit:cover;flex:none;}
+  .attachment-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px;}
+  .attachment-status{font-family:var(--font-mono);font-size:9px;color:var(--text-faint);flex:none;letter-spacing:.04em;}
+  .attachment-remove{background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:14px;line-height:1;padding:2px 2px;flex:none;}
+  .attachment-remove:hover{color:var(--danger);}
+  .attach-hint{font-size:11px;color:var(--text-faint);margin:0 0 10px;}
+
+  .examples{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-bottom:10px;
+  }
+  .example-chip{
+    font-family:var(--font-body);
+    font-size:12.5px;
+    color:var(--text-dim);
+    background:transparent;
+    border:1px solid var(--line-bright);
+    border-radius:20px;
+    padding:6px 13px;
+    cursor:pointer;
+    transition:border-color .15s,color .15s;
+  }
+  .example-chip:hover{border-color:var(--accent);color:var(--accent);}
+  .example-chip:disabled{opacity:.4;cursor:not-allowed;}
+
+  .composer-form{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    border:1px solid var(--line-bright);
+    border-radius:4px;
+    background:var(--bg-2);
+    padding:4px 6px 4px 14px;
+    transition:box-shadow .15s,border-color .15s;
+  }
+  .composer-form:focus-within{
+    border-color:var(--accent);
+    box-shadow:0 0 0 3px var(--accent-soft);
+  }
+  .prompt-glyph{
+    font-family:var(--font-mono);
+    color:var(--accent);
+    font-size:15px;
+    flex:none;
+  }
+  #input{
+    flex:1;
+    background:transparent;
+    border:none;
+    outline:none;
+    color:var(--text);
+    font-family:var(--font-body);
+    font-size:14.5px;
+    padding:10px 4px;
+    min-width:0;
+  }
+  #input::placeholder{color:var(--text-faint);}
+  #input:disabled{color:var(--text-faint);}
+
+  .icon-btn{
+    flex:none;
+    width:38px;height:38px;
+    display:grid;place-items:center;
+    background:transparent;
+    border:1px solid var(--line-bright);
+    border-radius:3px;
+    color:var(--text-dim);
+    cursor:pointer;
+    transition:border-color .15s,color .15s,background .15s;
+  }
+  .icon-btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent);}
+  .icon-btn:disabled{opacity:.35;cursor:not-allowed;}
+  .icon-btn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}
+  .icon-btn.mic-btn.listening{border-color:var(--danger);color:var(--danger);animation:micPulse 1s ease-in-out infinite;}
+  @keyframes micPulse{
+    0%,100%{box-shadow:0 0 0 0 rgba(var(--danger-rgb),.5);}
+    50%{box-shadow:0 0 0 6px rgba(var(--danger-rgb),0);}
+  }
+
+  .send-btn,.stop-btn{
+    font-family:var(--font-display);
+    font-size:12px;
+    letter-spacing:.08em;
+    border-radius:3px;
+    padding:10px 16px;
+    cursor:pointer;
+    border:1px solid transparent;
+    flex:none;
+  }
+  .send-btn{background:var(--accent);color:#04211f;font-weight:700;}
+  .send-btn:hover:not(:disabled){filter:brightness(1.08);}
+  .send-btn:disabled{background:var(--line-bright);color:var(--text-faint);cursor:not-allowed;}
+  .stop-btn{background:transparent;border-color:var(--danger);color:var(--danger);}
+  .stop-btn:hover{background:var(--danger-soft);}
+
+  .composer-note{
+    margin:8px 2px 0;
+    font-size:11px;
+    color:var(--accent-2);
+    min-height:14px;
+  }
+  .disclaimer{
+    margin:8px 2px 0;
+    font-size:11px;
+    line-height:1.5;
+    color:var(--text-faint);
+  }
+
+  @media (max-width:900px){
+    .app{padding:0 0 20px;}
+    .mobile-header{display:flex;padding-left:14px;padding-right:14px;}
+    .mobile-strip{display:flex;padding-left:14px;padding-right:14px;}
+    .left-zone{display:none;}
+    .console{padding:0 10px;}
+    .chat-panel{min-height:calc(100vh - 170px);border-left:none;border-right:none;border-radius:0;}
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    *{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;}
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="mobile-header">
+    <div class="orb aegis-status" id="coreMobile">
+      <svg viewBox="0 0 100 100" aria-hidden="true"><polyline points="30,68 30,32 70,68 70,32" fill="none" stroke="#4be3da" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>
+    </div>
+    <div class="mobile-title-wrap">
+      <div class="mobile-title">AEGIS</div>
+      <div class="mobile-subtitle">家族辦公室 AI 顧問</div>
+    </div>
+    <span class="mobile-status-pill" id="mobileStatusPill">連線中</span>
+  </header>
+  <div class="mobile-strip" id="mobileStrip" aria-label="專業模組狀態"></div>
+
+  <main class="console">
+    <section class="left-zone" aria-label="AEGIS 系統狀態">
+      <div class="corner tl"></div>
+      <div class="corner br"></div>
+      <svg class="n-watermark" viewBox="0 0 430 570" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+        <defs>
+          <linearGradient id="nwGrad" x1="0" y1="1" x2="0.15" y2="0">
+            <stop offset="0" stop-color="#070a10"></stop>
+            <stop offset="1" stop-color="#4be3da"></stop>
+          </linearGradient>
+        </defs>
+        <polyline points="65,510 65,60 365,510 365,60" fill="none" stroke="url(#nwGrad)" stroke-width="85" stroke-linecap="round" stroke-linejoin="round"></polyline>
+      </svg>
+
+      <div class="dials-row">
+        <div class="dial" id="dialMsg" style="--pct:0;"><div class="dial-inner"><div class="dial-val">0</div><div class="dial-label">訊息</div></div></div>
+        <div class="dial" id="dialAttach" style="--pct:0;"><div class="dial-inner"><div class="dial-val">0</div><div class="dial-label">附件</div></div></div>
+        <div class="dial" id="dialModules" style="--pct:0;"><div class="dial-inner"><div class="dial-val">0/10</div><div class="dial-label">已調度</div></div></div>
+        <div class="dial" id="dialChars" style="--pct:0;"><div class="dial-inner"><div class="dial-val">0</div><div class="dial-label">字數</div></div></div>
+      </div>
+
+      <div class="core-radar-row">
+        <div class="core-wrap">
+          <div class="tick-major"></div>
+          <div class="tick-minor"></div>
+          <div class="core-ring r1"></div>
+          <div class="core-ring r2"></div>
+          <div class="core-ring r3"></div>
+          <svg class="core-arc" viewBox="0 0 360 360" aria-hidden="true">
+            <circle cx="180" cy="180" r="150" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round"
+              stroke-dasharray="700 943" transform="rotate(-90 180 180)" opacity="0.9"></circle>
+          </svg>
+          <svg class="bracket-top" viewBox="0 0 150 24" aria-hidden="true">
+            <polyline points="0,2 22,20 52,10 75,18 98,10 128,20 150,2" fill="none" stroke="#4be3da" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+          </svg>
+          <svg class="bracket-bottom" viewBox="0 0 150 24" aria-hidden="true">
+            <polyline points="0,2 22,20 52,10 75,18 98,10 128,20 150,2" fill="none" stroke="#4be3da" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+          </svg>
+          <div class="core-disc aegis-status" id="core">
+            <div class="core-bg-n-mask">
+              <svg class="core-bg-n" viewBox="0 0 430 570" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+                <defs>
+                  <linearGradient id="coreNGrad" x1="0" y1="1" x2="0.15" y2="0">
+                    <stop offset="0" stop-color="#0b2a3c"></stop>
+                    <stop offset="1" stop-color="#4be3da"></stop>
+                  </linearGradient>
+                </defs>
+                <polyline points="65,510 65,60 365,510 365,60" fill="none" stroke="url(#coreNGrad)" stroke-width="85" stroke-linecap="round" stroke-linejoin="round"></polyline>
+              </svg>
+            </div>
+            <div class="core-name">AEGIS</div>
+            <div class="core-sub">FAMILY OFFICE AI</div>
+          </div>
+        </div>
+
+        <div class="radar-wrap">
+          <div class="radar-ring r1"></div>
+          <div class="radar-ring r2"></div>
+          <div class="radar-ring r3"></div>
+          <div class="radar-sweep"></div>
+          <span class="radar-dot" id="radarDot-tax" style="left:50%;top:12%;"></span>
+          <span class="radar-dot" id="radarDot-ins" style="left:72.3%;top:19.3%;"></span>
+          <span class="radar-dot" id="radarDot-str" style="left:86.1%;top:38.3%;"></span>
+          <span class="radar-dot" id="radarDot-est" style="left:86.1%;top:61.7%;"></span>
+          <span class="radar-dot" id="radarDot-law" style="left:72.3%;top:80.7%;"></span>
+          <span class="radar-dot" id="radarDot-mac" style="left:50%;top:88%;"></span>
+          <span class="radar-dot" id="radarDot-alc" style="left:27.7%;top:80.7%;"></span>
+          <span class="radar-dot" id="radarDot-art" style="left:13.9%;top:61.7%;"></span>
+          <span class="radar-dot" id="radarDot-pro" style="left:13.9%;top:38.3%;"></span>
+          <span class="radar-dot" id="radarDot-doc" style="left:27.7%;top:19.3%;"></span>
+        </div>
+      </div>
+      <div class="radar-caption">模組雷達・光點大小＝使用率（顏色對應右下方模組）</div>
+
+      <div class="status-readout">
+        <div class="status-row"><span class="dot" id="connDot"></span><span id="connLabel">CONNECTING</span></div>
+        <div class="status-row"><span id="sessionId">SESSION —</span><span id="clock">--:--:--</span></div>
+      </div>
+
+      <div class="modules-title">調度模組 · Dispatch</div>
+      <ul class="modules-list" id="modulesList"></ul>
+
+      <div class="bars-card">
+        <div class="card-title">各模組觸發次數</div>
+        <div class="bars-row" id="barsRow"></div>
+        <div class="bars-axis" id="barsAxis"></div>
+      </div>
+
+      <div class="spark-card">
+        <div class="card-title">AEGIS 回覆長度趨勢</div>
+        <svg class="spark-svg" id="sparkSvg" viewBox="0 0 380 56" preserveAspectRatio="none" hidden>
+          <polyline id="sparkLine" points="" fill="none" stroke="#4be3da" stroke-width="2"></polyline>
+        </svg>
+        <div class="spark-empty" id="sparkEmpty">尚無資料，開始對話後會即時畫出來</div>
+      </div>
+
+      <div class="compliance">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 20h20L12 3Z"></path><path d="M12 10v5"></path><circle cx="12" cy="18" r=".6" fill="currentColor"></circle></svg>
+        <span>所有結論均為初稿，正式規劃前請洽合格會計師／律師簽核。</span>
+      </div>
+    </section>
+
+    <section class="chat-panel" aria-label="與 AEGIS 對話">
+      <div class="panel-toolbar">
+        <div class="case-switcher" hidden>
+          <span class="case-label">案件</span>
+          <select id="caseSelect" aria-label="選擇案件"></select>
+          <button type="button" id="newCaseBtn" class="case-icon-btn" title="新增案件" aria-label="新增案件">＋</button>
+          <button type="button" id="renameCaseBtn" class="case-icon-btn" title="重新命名案件" aria-label="重新命名案件">✎</button>
+          <button type="button" id="deleteCaseBtn" class="case-icon-btn" title="刪除案件" aria-label="刪除案件">🗑</button>
+        </div>
+        <div class="case-editor" id="caseEditor" hidden>
+          <input type="text" id="caseNameInput" placeholder="案件名稱" autocomplete="off" aria-label="案件名稱" />
+          <button type="button" id="caseEditorConfirm" class="case-icon-btn" title="確定">✓</button>
+          <button type="button" id="caseEditorCancel" class="case-icon-btn" title="取消">✕</button>
+        </div>
+        <label class="toggle" id="speakToggle" hidden>
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          <span>語音朗讀回覆</span>
+        </label>
+      </div>
+
+      <div class="messages" id="messages" aria-live="polite"></div>
+
+      <div class="composer">
+        <div class="attachments-row" id="attachmentsRow"></div>
+        <p class="attach-hint" id="attachHint">可附上圖片、PDF、Excel（.xlsx／.xls）、CSV 或文字檔。圖片與掃描版 PDF 由 AEGIS 直接用視覺讀取內容（等同 OCR），不需另外辨識。</p>
+
+        <div class="examples" id="examples">
+          <button type="button" class="example-chip" data-text="幫我算一個客戶家族的遺產稅與稅源缺口">遺產稅稅源缺口試算</button>
+          <button type="button" class="example-chip" data-text="這個家族資產一億多，該怎麼設計傳承架構？">傳承架構怎麼設計</button>
+          <button type="button" class="example-chip" data-text="幫我彙整今天的全球總體經濟重點">今日總經摘要</button>
+        </div>
+
+        <form id="composerForm" class="composer-form">
+          <span class="prompt-glyph" aria-hidden="true">&gt;</span>
+          <label for="input" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">輸入訊息</label>
+          <input id="input" type="text" placeholder="輸入你的需求，或用語音、附件提供案件資料" autocomplete="off" />
+          <input type="file" id="fileInput" multiple hidden accept="image/*,.pdf,.csv,.txt,.md,.json,.xlsx,.xls" />
+          <button type="button" id="attachBtn" class="icon-btn" title="附加檔案" aria-label="附加檔案">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5 12.5 20a4.5 4.5 0 0 1-6.36-6.36L14.6 5.1a3 3 0 0 1 4.24 4.24l-8.49 8.49a1.5 1.5 0 0 1-2.12-2.12l7.78-7.78"></path></svg>
+          </button>
+          <button type="button" id="micBtn" class="icon-btn mic-btn" title="語音輸入" aria-label="語音輸入" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0"></path><path d="M12 18v4"></path><path d="M8 22h8"></path></svg>
+          </button>
+          <button type="submit" id="sendBtn" class="send-btn">送出</button>
+          <button type="button" id="stopBtn" class="stop-btn" hidden>停止</button>
+        </form>
+        <p class="composer-note" id="composerNote"></p>
+        <p class="disclaimer">AI 產生內容僅供內部規劃初稿參考，正式稅務、法律、保單建議須經合格會計師或律師簽核；個案認定以主管機關為準。</p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var SYSTEM_INSTRUCTIONS = [
+    "你是「AEGIS」，一位家族辦公室的 AI 顧問。使用者是保險經紀專業背景的家辦顧問，他只會跟你一個人對話——背後你統籌十種專業能力（稅法法規、保單／稅源試算、傳承架構規劃、不動產暨資產估價、法律研究、總經情報、投資組合／資產配置、藝術品暨名錶鑑賞、客戶提案生成、家族會議文件），但使用者不需要知道細節，你就像貼身管家一樣，把需求聽懂、問清楚，給出有用的整合建議。",
+    "",
+    "使用者可能用語音輸入（會被轉成文字）、或附上文字檔、PDF 擷取文字、Excel 資料、圖片等案件資料，這些都算案件資料的一部分，直接根據內容回應即可，不用特別解釋你是怎麼收到的。PDF／Excel 附件是擷取出來的純文字，可能不完整或格式跑掉；圖片與掃描版 PDF 會直接以圖像形式交給你看，等同你在幫忙做 OCR，請直接讀出圖片中的文字與數字內容，看不清楚的部分就誠實說看不清楚，不要編造。",
+    "",
+    "對話原則：",
+    "1. 一次只問一到兩個最關鍵的小問題，不要一次列一堆問卷式問題。",
+    "2. 每問一題，順帶說一句「為什麼問」。",
+    "3. 對方不確定就用合理假設往下走，並清楚標示這是假設。",
+    "4. 用白話講專業術語；結論先講，細節在後。",
+    "5. 資訊足夠時，先做一次「我掌握到的是…對嗎？」的摘要確認，再給建議或試算。",
+    "",
+    "護欄（每次都要守）：",
+    "- 所有稅務、法律、保單結論都是「初稿」，結尾提醒須經合格會計師／律師簽核，個案以主管機關認定為準。",
+    "- 稅制數字使用台灣 114 年制（2026 年沿用）：遺產稅免稅額 1,333 萬、三級級距 5,621 萬／1 億 1,242 萬（稅率 10%/15%/20%）；贈與稅每年免稅額 244 萬；最低稅負制保險死亡給付免稅額度每申報戶 3,740 萬、基本所得額扣除額 750 萬、稅率 20%。",
+    "- 【2026/9/11 新制】遺產及贈與稅法修正已公布施行：死亡前 2 年內贈與視為遺產（擬制遺產）的稅額，改由『實際受贈人』依受贈財產占遺產總額比例負擔（不再由全體繼承人連帶承擔），且以受贈財產價值為上限；死亡前 2 年內贈與配偶的財產計入剩餘財產差額分配請求權可扣除範圍且扣除額放大；分期繳納取消 30 萬元門檻；存款繳稅可由繼承人多數決（過半人數且過半應繼分，或應繼分逾三分之二）辦理，不須全體同意。提到生前贈與、大房小房、繼承人分攤稅款時務必套用新制，並提醒這是新修正條文、個案細節待會計師／律師確認。",
+    "- 不動產：計入遺產／贈與總額以公告土地現值＋房屋評定現值（非市價），通常遠低於市價，變現力差常是稅源缺口主因；持有或處分不動產另需留意房地合一稅 2.0、土地增值稅、囤房稅 2.0 等持有稅負，屬於「不動產暨資產估價官」的專業範圍，遇到具體稅額試算或都更／危老／農地等特殊狀態時，提醒這部分建議由專人深入分析。",
+    "- 資產配置：面對股票、基金、保單現金價值、不動產、現金等分散部位，只在『資產類別』層級給方向性建議（比例區間、集中度風險提醒），並先扣除稅源缺口所需的流動部位；絕不對個股或特定基金做買賣建議、加碼／減碼建議或保證報酬（無證券投顧執照）。",
+    "- 不給個股／特定商品買賣建議、不保證報酬、不誇大保單免稅效果（免遺產稅 ≠ 免最低稅負制）。",
+    "- 若客戶資產或家族辦公室設置涉及香港、新加坡等境外地區，明白提醒當地稅制、信託與監理規範（例如香港家族辦公室稅務寬減、新加坡 13O／13U 計畫）與台灣制度不同，不可用台灣規則套用，須轉介當地合格顧問。",
+    "- 法律研究：遇到稅法以外的法律問題（特留分與繼承爭議、公司治理與併購防禦、信託法基本架構、婚姻財產）只做附法源方向的初步研判，不出具正式法律意見；已進入訴訟或有明確對造的個案，第一句話就提醒儘速洽律師。",
+    "- 收藏性資產（藝術品、古董、名錶、珠寶）：評價缺乏公開市價，需靠專業鑑定報告與拍賣成交行情佐證，不對特定拍品或品牌做增值預測；提醒真偽來源風險、足額保險（尤其可銜接顧問的保險專業）、以及這類資產在繼承分配時容易引發家族爭議，宜及早討論分配方式。",
+    "- 不索取身分證字號等非必要個資。",
+    "",
+    "語氣：繁體中文，溫暖、專業、有耐心，像資深管家對主人說話，但不阿諛奉承。回覆不要過長，先講結論。",
+    "",
+    "現在，請以這個角色回應使用者的訊息。"
+  ].join("\n");
+
+  var GREETING = "你好，我是 AEGIS，你的家族辦公室 AI 顧問。今天想先從哪裡開始——是有個客戶家族要規劃傳承、想試算某個案子的稅源缺口，還是先聊聊方向？你可以直接打字、按麥克風用說的，或是附上資產清單、保單等檔案給我看。";
+
+  var MODULES = [
+    {id:"tax", code:"TAX", name:"稅法法規官", color:"#4be3da", rgb:"75,227,218", kw:["遺產稅","贈與稅","稅法","實質課稅","最低稅負","AMT","CFC","CRS","法源","稅負"]},
+    {id:"ins", code:"INS", name:"保單／稅源試算官", color:"#d8ab63", rgb:"216,171,99", kw:["稅源缺口","保額","要保人","被保險人","受益人","保單","試算","現金流"]},
+    {id:"str", code:"STR", name:"傳承架構規劃官", color:"#a78bfa", rgb:"167,139,250", kw:["信託","控股","閉鎖性","遺囑","架構","移轉路徑","特留分"]},
+    {id:"est", code:"EST", name:"不動產暨資產估價官", color:"#fb923c", rgb:"251,146,60", kw:["不動產","公告現值","房地合一稅","土地增值稅","囤房稅","都更","危老","農地","估價"]},
+    {id:"law", code:"LAW", name:"法律研究官", color:"#ef4444", rgb:"239,68,68", kw:["特留分","繼承爭議","公司治理","併購防禦","表決權","信託法","訴訟","法條"]},
+    {id:"mac", code:"MAC", name:"總經情報官", color:"#60a5fa", rgb:"96,165,250", kw:["總經","利率","匯率","Fed","央行","GDP","CPI","股指","油價"]},
+    {id:"alc", code:"ALC", name:"投資組合／資產配置官", color:"#facc15", rgb:"250,204,21", kw:["資產配置","投資組合","再平衡","股票","基金","集中度","風險屬性"]},
+    {id:"art", code:"ART", name:"藝術品暨名錶鑑賞官", color:"#14b8a6", rgb:"20,184,166", kw:["藝術品","古董","名錶","珠寶","收藏","鑑定","拍賣","真偽"]},
+    {id:"pro", code:"PRO", name:"客戶提案生成官", color:"#f472b6", rgb:"244,114,182", kw:["提案","簡報","一頁式","說帖","客戶版"]},
+    {id:"doc", code:"DOC", name:"家族會議文件官", color:"#86efac", rgb:"134,239,172", kw:["會議記錄","家族憲章","議程","決議","文件庫"]}
+  ];
+
+  var MAX_TOTAL_ATTACH_CHARS = 6000;
+  var MAX_PER_FILE_CHARS = 3000;
+  var MAX_PDF_PAGES = 20;
+  var MAX_ATTACHMENTS = 6;
+  var MAX_FILE_BYTES = 20 * 1024 * 1024;
+  var MAX_SPARK_POINTS = 12;
+
+  var PDFJS_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+  var PDFJS_WORKER_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  var XLSX_URL = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+
+  var messagesEl = document.getElementById("messages");
+  var modulesListEl = document.getElementById("modulesList");
+  var mobileStripEl = document.getElementById("mobileStrip");
+  var mobileStatusPillEl = document.getElementById("mobileStatusPill");
+  var form = document.getElementById("composerForm");
+  var input = document.getElementById("input");
+  var sendBtn = document.getElementById("sendBtn");
+  var stopBtn = document.getElementById("stopBtn");
+  var attachBtn = document.getElementById("attachBtn");
+  var fileInput = document.getElementById("fileInput");
+  var micBtn = document.getElementById("micBtn");
+  var speakToggle = document.getElementById("speakToggle");
+  var examplesEl = document.getElementById("examples");
+  var attachmentsRowEl = document.getElementById("attachmentsRow");
+  var attachHintEl = document.getElementById("attachHint");
+  var composerNoteEl = document.getElementById("composerNote");
+  var coreEl = document.getElementById("core");
+  var coreMobileEl = document.getElementById("coreMobile");
+  var connDot = document.getElementById("connDot");
+  var connLabel = document.getElementById("connLabel");
+  var clockEl = document.getElementById("clock");
+  var sessionIdEl = document.getElementById("sessionId");
+
+  var dialMsgEl = document.getElementById("dialMsg");
+  var dialAttachEl = document.getElementById("dialAttach");
+  var dialModulesEl = document.getElementById("dialModules");
+  var dialCharsEl = document.getElementById("dialChars");
+  var sparkSvgEl = document.getElementById("sparkSvg");
+  var sparkLineEl = document.getElementById("sparkLine");
+  var sparkEmptyEl = document.getElementById("sparkEmpty");
+  var barsRowEl = document.getElementById("barsRow");
+  var barsAxisEl = document.getElementById("barsAxis");
+  var caseSwitcherEl = document.querySelector(".case-switcher");
+  var caseSelectEl = document.getElementById("caseSelect");
+  var newCaseBtn = document.getElementById("newCaseBtn");
+  var renameCaseBtn = document.getElementById("renameCaseBtn");
+  var deleteCaseBtn = document.getElementById("deleteCaseBtn");
+  var caseEditorEl = document.getElementById("caseEditor");
+  var caseNameInputEl = document.getElementById("caseNameInput");
+  var caseEditorConfirmBtn = document.getElementById("caseEditorConfirm");
+  var caseEditorCancelBtn = document.getElementById("caseEditorCancel");
+
+  var turns = [{role:"user", content: SYSTEM_INSTRUCTIONS}, {role:"assistant", content: GREETING}];
+  var MAX_IMAGES = 5; /* Anthropic Messages API practical limit for this app; no per-viewer "limits" endpoint to query like the old sample() capability had */
+  var granted = true;
+  var busy = false;
+  var controller = null;
+  var attachments = [];
+  var attCounter = 0;
+  var scriptPromises = {};
+  var speakEnabled = false;
+  var voicesCache = [];
+
+  /* ---------- real session telemetry ---------- */
+  var stats = {msgCount:0, attachCount:0, charTotal:0};
+  var moduleTriggerCounts = {};
+  var replyLengths = [];
+  MODULES.forEach(function(m){ moduleTriggerCounts[m.id] = 0; });
+
+  /* ---------- per-case memory (own backend + Vercel KV) ----------
+     Each family case gets its own persistent conversation, like separate
+     sessions that don't bleed into each other. Talks to /api/cases instead
+     of the claude.ai artifact's built-in db capability - see api/cases.js
+     and api/cases/[id].js. No realtime push here (no websockets/SSE in
+     this minimal backend), so the case LIST is refreshed by polling
+     instead of a live subscription - see refreshCaseList(). */
+  var currentCaseId = null;
+  var macroBlock = "";
+  var loadingCase = false;
+  var caseListPollTimer = null;
+
+  function setDial(el, pct, val){
+    el.style.setProperty("--pct", Math.max(0, Math.min(100, pct)));
+    el.querySelector(".dial-val").textContent = val;
+  }
+  function renderStats(){
+    var usedCount = document.querySelectorAll("#modulesList .module-item.used").length;
+    setDial(dialMsgEl, Math.min(100, stats.msgCount * 12), String(stats.msgCount));
+    setDial(dialAttachEl, Math.min(100, stats.attachCount * 20), String(stats.attachCount));
+    setDial(dialModulesEl, (usedCount / MODULES.length) * 100, usedCount + "/" + MODULES.length);
+    setDial(dialCharsEl, Math.min(100, stats.charTotal / 30), stats.charTotal.toLocaleString());
+  }
+
+  function renderSparkline(){
+    if(replyLengths.length < 2){
+      sparkSvgEl.hidden = true; sparkEmptyEl.hidden = false; return;
+    }
+    sparkSvgEl.hidden = false; sparkEmptyEl.hidden = true;
+    var max = Math.max.apply(null, replyLengths);
+    var min = Math.min.apply(null, replyLengths);
+    var span = Math.max(1, max - min);
+    var n = replyLengths.length;
+    var pts = replyLengths.map(function(v, i){
+      var x = (i / (n - 1)) * 380;
+      var y = 50 - ((v - min) / span) * 44;
+      return x.toFixed(1) + "," + y.toFixed(1);
+    });
+    sparkLineEl.setAttribute("points", pts.join(" "));
+  }
+
+  function updateRadarDots(){
+    var max = Math.max(1, Math.max.apply(null, MODULES.map(function(m){ return moduleTriggerCounts[m.id]; })));
+    MODULES.forEach(function(m){
+      var dot = document.getElementById("radarDot-" + m.id);
+      if(!dot) return;
+      var c = moduleTriggerCounts[m.id];
+      var ratio = c / max;
+      var r = c > 0 ? (5 + ratio * 9) : 4;
+      var glow = c > 0 ? (4 + ratio * 10) : 0;
+      dot.style.setProperty("--r", r + "px");
+      dot.style.setProperty("--glow", glow + "px");
+      dot.title = m.name + "：使用率 " + Math.round(ratio * 100) + "%（" + c + " 次）";
+    });
+  }
+
+  function renderBars(){
+    barsRowEl.innerHTML = "";
+    barsAxisEl.innerHTML = "";
+    var max = Math.max(1, Math.max.apply(null, MODULES.map(function(m){ return moduleTriggerCounts[m.id]; })));
+    MODULES.forEach(function(m){
+      var bar = document.createElement("div");
+      bar.className = "bar";
+      var h = (moduleTriggerCounts[m.id] / max) * 100;
+      bar.style.height = (moduleTriggerCounts[m.id] > 0 ? Math.max(6, h) : 2) + "%";
+      bar.title = m.name + "：" + moduleTriggerCounts[m.id] + " 次";
+      barsRowEl.appendChild(bar);
+      var axis = document.createElement("span");
+      axis.textContent = m.code;
+      barsAxisEl.appendChild(axis);
+    });
+  }
+
+  /* ---------- modules ---------- */
+  function renderModules(){
+    modulesListEl.innerHTML = "";
+    mobileStripEl.innerHTML = "";
+    MODULES.forEach(function(m){
+      var li = document.createElement("li");
+      li.className = "module-item";
+      li.id = "mod-" + m.id;
+      var badge = document.createElement("span");
+      badge.className = "module-badge";
+      badge.textContent = m.code;
+      var name = document.createElement("span");
+      name.className = "module-name";
+      name.textContent = m.name;
+      var status = document.createElement("span");
+      status.className = "module-status";
+      li.appendChild(badge); li.appendChild(name); li.appendChild(status);
+      li.style.setProperty("--dot-color", m.color);
+      li.style.setProperty("--dot-rgb", m.rgb);
+      modulesListEl.appendChild(li);
+
+      var chip = document.createElement("span");
+      chip.className = "mobile-chip";
+      chip.id = "mchip-" + m.id;
+      chip.textContent = m.code;
+      chip.style.setProperty("--dot-color", m.color);
+      chip.style.setProperty("--dot-rgb", m.rgb);
+      mobileStripEl.appendChild(chip);
+
+      var radarDot = document.getElementById("radarDot-" + m.id);
+      if(radarDot){
+        radarDot.style.setProperty("--dot-color", m.color);
+        radarDot.style.setProperty("--dot-rgb", m.rgb);
+      }
+    });
+    renderBars();
+  }
+  renderModules();
+
+  function detectModules(text){
+    var any = false;
+    MODULES.forEach(function(m){
+      var hit = m.kw.some(function(k){ return text.indexOf(k) !== -1; });
+      if(!hit) return;
+      any = true;
+      moduleTriggerCounts[m.id]++;
+      var li = document.getElementById("mod-" + m.id);
+      if(li){
+        li.classList.add("active", "used");
+        window.setTimeout(function(){ li.classList.remove("active"); }, 2200);
+      }
+      var chip = document.getElementById("mchip-" + m.id);
+      if(chip){
+        chip.classList.add("used");
+      }
+      var radarDot = document.getElementById("radarDot-" + m.id);
+      if(radarDot){
+        radarDot.classList.add("lit", "active");
+        window.setTimeout(function(){ radarDot.classList.remove("active"); }, 2200);
+      }
+    });
+    if(any){ renderBars(); renderStats(); updateRadarDots(); }
+  }
+
+  /* ---------- messages ---------- */
+  function escapeHtml(s){
+    return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+  function formatMessage(raw){
+    var s = escapeHtml(raw);
+    s = s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    s = s.replace(/^[-•]\s+(.*)$/gm, "‣ $1");
+    s = s.replace(/\n/g, "<br>");
+    return s;
+  }
+
+  function appendMessage(role, text, opts){
+    opts = opts || {};
+    var wrap = document.createElement("div");
+    wrap.className = "msg " + role;
+    if(role === "assistant"){
+      var meta = document.createElement("div");
+      meta.className = "msg-meta";
+      meta.textContent = "AEGIS";
+      wrap.appendChild(meta);
+    }
+    var bubble = document.createElement("div");
+    bubble.className = "msg-bubble" + (opts.pending ? " pending" : "");
+    bubble.innerHTML = opts.pending ? "思考中…" : formatMessage(text);
+    wrap.appendChild(bubble);
+    if(opts.attachments && opts.attachments.length){
+      var list = document.createElement("div");
+      list.className = "msg-attachments";
+      list.textContent = "附件：" + opts.attachments.join("、");
+      wrap.appendChild(list);
+    }
+    messagesEl.appendChild(wrap);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return bubble;
+  }
+
+  function setMessageText(bubble, text){
+    bubble.classList.remove("pending");
+    bubble.innerHTML = formatMessage(text);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  appendMessage("assistant", GREETING);
+
+  function setCore(state){
+    [coreEl, coreMobileEl].forEach(function(el){
+      if(!el) return;
+      el.classList.remove("thinking","speaking","offline");
+      if(state) el.classList.add(state);
+    });
+  }
+
+  function setComposerEnabled(enabled){
+    input.disabled = !enabled;
+    sendBtn.disabled = !enabled;
+    attachBtn.disabled = !enabled;
+    Array.prototype.forEach.call(examplesEl.querySelectorAll(".example-chip"), function(btn){
+      btn.disabled = !enabled;
+    });
+  }
+
+  function showStop(show){
+    stopBtn.hidden = !show;
+    sendBtn.hidden = show;
+  }
+
+  function noteComposer(text, durationMs){
+    composerNoteEl.textContent = text || "";
+    if(text){
+      window.setTimeout(function(){
+        if(composerNoteEl.textContent === text) composerNoteEl.textContent = "";
+      }, durationMs || 4000);
+    }
+  }
+
+  /* ---------- attachments ---------- */
+  function refreshAttachHint(){
+    attachHintEl.hidden = attachments.length > 0;
+  }
+
+  function classifyFile(file){
+    var name = file.name.toLowerCase();
+    if(file.type.indexOf("image/") === 0) return "image";
+    if(/\.pdf$/.test(name) || file.type === "application/pdf") return "pdf";
+    if(/\.(xlsx|xls)$/.test(name)) return "sheet";
+    if(/\.(txt|csv|md|json)$/.test(name) || file.type.indexOf("text/") === 0 || file.type === "application/json") return "text";
+    return "unsupported";
+  }
+
+  function readAsText(file){
+    return new Promise(function(resolve, reject){
+      var r = new FileReader();
+      r.onload = function(){ resolve(String(r.result)); };
+      r.onerror = function(){ reject(r.error); };
+      r.readAsText(file);
+    });
+  }
+  function readAsArrayBuffer(file){
+    return new Promise(function(resolve, reject){
+      var r = new FileReader();
+      r.onload = function(){ resolve(r.result); };
+      r.onerror = function(){ reject(r.error); };
+      r.readAsArrayBuffer(file);
+    });
+  }
+  function loadScript(src){
+    if(scriptPromises[src]) return scriptPromises[src];
+    scriptPromises[src] = new Promise(function(resolve, reject){
+      var s = document.createElement("script");
+      s.src = src; s.async = true;
+      s.onload = function(){ resolve(); };
+      s.onerror = function(){ reject(new Error("load failed")); };
+      document.head.appendChild(s);
+    });
+    return scriptPromises[src];
+  }
+  function ensurePdfJs(){
+    return loadScript(PDFJS_URL).then(function(){
+      if(window.pdfjsLib){ window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL; }
+      return window.pdfjsLib;
+    });
+  }
+  function ensureXlsx(){
+    return loadScript(XLSX_URL).then(function(){ return window.XLSX; });
+  }
+
+  var SCAN_DENSITY_THRESHOLD = 25; /* avg non-space chars per page below this = likely a scanned (image-only) PDF */
+  var OCR_FALLBACK_PAGES = 3;
+
+  function renderPageToBlob(page){
+    var viewport = page.getViewport({scale: 1.6});
+    var canvas = document.createElement("canvas");
+    canvas.width = viewport.width; canvas.height = viewport.height;
+    var ctx = canvas.getContext("2d");
+    return page.render({canvasContext: ctx, viewport: viewport}).promise.then(function(){
+      return new Promise(function(resolve){ canvas.toBlob(function(blob){ resolve(blob); }, "image/png"); });
+    });
+  }
+
+  /* Extracts a PDF's text; when a page carries almost no text (a scanned /
+     photographed document with no text layer), falls back to rendering the
+     first few pages as images so AEGIS can read them directly with vision
+     ("OCR" without a separate OCR engine). */
+  function processPdf(att){
+    readAsArrayBuffer(att.file).then(function(buf){
+      return ensurePdfJs().then(function(pdfjsLib){
+        return pdfjsLib.getDocument({data: buf}).promise.then(function(doc){
+          var maxPages = Math.min(doc.numPages, MAX_PDF_PAGES);
+          var pageNums = [];
+          for(var i = 1; i <= maxPages; i++) pageNums.push(i);
+          return Promise.all(pageNums.map(function(n){ return doc.getPage(n); })).then(function(pages){
+            return Promise.all(pages.map(function(page){
+              return page.getTextContent().then(function(tc){
+                return tc.items.map(function(it){ return it.str; }).join(" ");
+              });
+            })).then(function(texts){
+              var combined = texts.join("\n\n");
+              var density = combined.replace(/\s/g, "").length / maxPages;
+              var canOcrFallback = limitsCache && limitsCache.images;
+              if(density >= SCAN_DENSITY_THRESHOLD || !canOcrFallback){
+                var finalText = combined;
+                if(doc.numPages > maxPages){ finalText += "\n\n…（僅擷取前 " + maxPages + " 頁，共 " + doc.numPages + " 頁）"; }
+                if(density < SCAN_DENSITY_THRESHOLD && !canOcrFallback){
+                  finalText += "\n\n（這份文件文字層很少，可能是掃描檔，此環境暫時無法用圖像辨識備援）";
+                }
+                att.text = truncate(finalText, MAX_PER_FILE_CHARS);
+                att.isScanned = false;
+                att.status = "ready";
+                updateChip(att);
+                return;
+              }
+              var ocrPages = pages.slice(0, Math.min(pages.length, OCR_FALLBACK_PAGES));
+              return Promise.all(ocrPages.map(renderPageToBlob)).then(function(blobs){
+                att.imageBlobs = blobs.filter(Boolean);
+                att.isScanned = true;
+                att.text = doc.numPages > ocrPages.length
+                  ? "（掃描檔：僅以前 " + ocrPages.length + " 頁的圖像辨識，共 " + doc.numPages + " 頁）"
+                  : "";
+                att.status = "ready";
+                updateChip(att);
+              });
+            });
+          });
+        });
+      });
+    }).catch(function(){
+      att.status = "error"; att.errorMsg = "PDF 解析失敗"; updateChip(att);
+    });
+  }
+  function extractXlsxText(buf){
+    return ensureXlsx().then(function(XLSX){
+      var wb = XLSX.read(buf, {type:"array"});
+      var parts = wb.SheetNames.map(function(name){
+        var csv = XLSX.utils.sheet_to_csv(wb.Sheets[name]);
+        return "【工作表：" + name + "】\n" + csv;
+      });
+      return parts.join("\n\n");
+    });
+  }
+
+  function truncate(s, max){
+    return s.length > max ? s.slice(0, max) + "\n…（內容過長，已截斷）" : s;
+  }
+
+  function renderAttachmentChip(att){
+    var chip = document.createElement("div");
+    chip.className = "attachment-chip";
+    chip.id = "att-" + att.id;
+    if(att.kind === "image"){
+      var img = document.createElement("img");
+      img.className = "attachment-thumb";
+      img.alt = "";
+      chip.appendChild(img);
+      att.imgEl = img;
+    }
+    var name = document.createElement("span");
+    name.className = "attachment-name";
+    name.textContent = att.file.name;
+    var status = document.createElement("span");
+    status.className = "attachment-status";
+    var remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "attachment-remove";
+    remove.setAttribute("aria-label", "移除附件 " + att.file.name);
+    remove.textContent = "×";
+    remove.addEventListener("click", function(){ removeAttachment(att.id); });
+    chip.appendChild(name); chip.appendChild(status); chip.appendChild(remove);
+    att.statusEl = status;
+    att.chipEl = chip;
+    attachmentsRowEl.appendChild(chip);
+  }
+
+  function updateChip(att){
+    if(!att.chipEl) return;
+    att.chipEl.classList.remove("ready", "error");
+    if(att.status === "ready"){
+      att.chipEl.classList.add("ready");
+      att.statusEl.textContent = att.isScanned ? "掃描檔・圖像辨識" : "已讀取";
+      if(att.imgEl && att.thumbUrl) att.imgEl.src = att.thumbUrl;
+    } else if(att.status === "error"){
+      att.chipEl.classList.add("error");
+      att.statusEl.textContent = att.errorMsg || "失敗";
+    } else {
+      att.statusEl.textContent = "讀取中…";
+    }
+  }
+
+  function removeAttachment(id){
+    var idx = attachments.findIndex(function(a){ return a.id === id; });
+    if(idx === -1) return;
+    var att = attachments[idx];
+    if(att.thumbUrl) URL.revokeObjectURL(att.thumbUrl);
+    if(att.chipEl && att.chipEl.parentNode) att.chipEl.parentNode.removeChild(att.chipEl);
+    attachments.splice(idx, 1);
+    refreshAttachHint();
+  }
+
+  function clearAttachments(){
+    attachments.forEach(function(att){ if(att.thumbUrl) URL.revokeObjectURL(att.thumbUrl); });
+    attachments = [];
+    attachmentsRowEl.innerHTML = "";
+    refreshAttachHint();
+  }
+
+  function processAttachment(att){
+    if(att.file.size > MAX_FILE_BYTES){
+      att.status = "error"; att.errorMsg = "檔案過大（上限 20MB）"; updateChip(att); return;
+    }
+    if(att.kind === "image"){
+      if(!(limitsCache && limitsCache.images)){
+        att.status = "error"; att.errorMsg = "此環境無法傳送圖片"; updateChip(att); return;
+      }
+      if(limitsCache.images.maxInputBytes && att.file.size > limitsCache.images.maxInputBytes){
+        att.status = "error"; att.errorMsg = "圖片檔案過大"; updateChip(att); return;
+      }
+      att.thumbUrl = URL.createObjectURL(att.file);
+      att.status = "ready"; updateChip(att);
+      return;
+    }
+    if(att.kind === "text"){
+      readAsText(att.file).then(function(t){
+        att.text = truncate(t, MAX_PER_FILE_CHARS); att.status = "ready"; updateChip(att);
+      }).catch(function(){ att.status = "error"; att.errorMsg = "讀取失敗"; updateChip(att); });
+      return;
+    }
+    if(att.kind === "pdf"){
+      processPdf(att);
+      return;
+    }
+    if(att.kind === "sheet"){
+      readAsArrayBuffer(att.file).then(extractXlsxText).then(function(t){
+        att.text = truncate(t, MAX_PER_FILE_CHARS); att.status = "ready"; updateChip(att);
+      }).catch(function(){ att.status = "error"; att.errorMsg = "Excel 解析失敗"; updateChip(att); });
+      return;
+    }
+    att.status = "error"; att.errorMsg = "尚未支援此格式"; updateChip(att);
+  }
+
+  function addFiles(fileList){
+    var files = Array.prototype.slice.call(fileList);
+    if(attachments.length + files.length > MAX_ATTACHMENTS){
+      var allowed = Math.max(0, MAX_ATTACHMENTS - attachments.length);
+      files = files.slice(0, allowed);
+      noteComposer("最多同時附加 " + MAX_ATTACHMENTS + " 個檔案，其餘未加入");
+    }
+    files.forEach(function(file){
+      var att = {id:"a" + (attCounter++), file:file, kind:classifyFile(file), status:"parsing", text:"", thumbUrl:null};
+      attachments.push(att);
+      renderAttachmentChip(att);
+      updateChip(att);
+      processAttachment(att);
+    });
+    refreshAttachHint();
+  }
+
+  attachBtn.addEventListener("click", function(){ fileInput.click(); });
+  fileInput.addEventListener("change", function(){
+    if(fileInput.files && fileInput.files.length) addFiles(fileInput.files);
+    fileInput.value = "";
+  });
+
+  function buildAttachmentPayload(){
+    var textParts = [];
+    var images = [];
+    var names = [];
+    var total = 0;
+    attachments.forEach(function(att){
+      if(att.status !== "ready") return;
+      names.push(att.file.name + (att.isScanned ? "（圖像辨識）" : ""));
+      if(att.kind === "image"){
+        images.push(att.file);
+        return;
+      }
+      if(att.isScanned && att.imageBlobs && att.imageBlobs.length){
+        images = images.concat(att.imageBlobs);
+      }
+      if(!att.text) return;
+      var remaining = MAX_TOTAL_ATTACH_CHARS - total;
+      if(remaining <= 0) return;
+      var chunk = att.text.length > remaining ? att.text.slice(0, remaining) : att.text;
+      textParts.push("【附件：" + att.file.name + "】\n" + chunk);
+      total += chunk.length;
+    });
+    if(limitsCache && limitsCache.images && images.length > limitsCache.images.maxCount){
+      images = images.slice(0, limitsCache.images.maxCount);
+    }
+    return {textParts: textParts, images: images, names: names};
+  }
+
+  /* ---------- errors ---------- */
+  var ERROR_COPY = {
+    not_granted: "你尚未允許這個頁面使用 AI 對話功能，之後的訊息暫時無法送出。",
+    sampling_disabled: "目前這個帳號無法使用 AI 對話功能。",
+    not_declared: "這個頁面的 AI 對話功能未啟用。",
+    capability_disabled: "AI 對話功能目前無法使用。",
+    capability_removed: "此環境不支援這個 AI 對話功能。",
+    rate_limited: "請求有點多，請稍後再試一次。",
+    session_expired: "登入已逾時，請重新整理頁面。",
+    prompt_too_large: "這段對話（含附件）太長了，請減少附件內容或分段再問。",
+    refused: "這個問題我沒辦法直接回覆，可以換個方式再問一次。",
+    empty_completion: "沒有取得回覆，請再問一次或換個說法。",
+    upstream_error: "系統暫時無法回應，請重試一次。"
+  };
+  var PERMANENT_CODES = {not_granted:1, sampling_disabled:1, not_declared:1, capability_disabled:1, capability_removed:1};
+
+  function handleError(e, bubble, images){
+    var code = (e && e.code) || "upstream_error";
+    if(code === "cancelled"){
+      var partial = (e && e.text) || "";
+      if(partial){ setMessageText(bubble, partial); }
+      else if(bubble.parentNode){ bubble.parentNode.parentNode.removeChild(bubble.parentNode); }
+      return;
+    }
+    var copy = ERROR_COPY[code] || ERROR_COPY.upstream_error;
+    bubble.classList.add("error");
+    bubble.classList.remove("pending");
+    bubble.innerHTML = formatMessage(copy);
+    if(!PERMANENT_CODES[code]){
+      var retry = document.createElement("button");
+      retry.type = "button";
+      retry.className = "retry-btn";
+      retry.textContent = "重試";
+      retry.addEventListener("click", function(){
+        var wrap = bubble.parentNode;
+        if(wrap && wrap.parentNode) wrap.parentNode.removeChild(wrap);
+        callSample(images);
+      });
+      bubble.appendChild(retry);
+    }
+    if(PERMANENT_CODES[code]){
+      granted = false;
+      setComposerEnabled(false);
+      setCore("offline");
+      connLabel.textContent = "OFFLINE";
+      connDot.className = "dot warn";
+      mobileStatusPillEl.textContent = "離線";
+    }
+  }
+
+  /* ---------- per-case memory: state helpers ---------- */
+  function buildSystemTurn(){
+    return {role:"user", content: SYSTEM_INSTRUCTIONS + macroBlock};
+  }
+
+  function freshCaseBody(name){
+    var now = new Date().toISOString();
+    var counts = {};
+    MODULES.forEach(function(m){ counts[m.id] = 0; });
+    return {
+      name: name || "未命名案件",
+      createdAt: now,
+      updatedAt: now,
+      turns: [],
+      stats: {msgCount:0, attachCount:0, charTotal:0},
+      moduleTriggerCounts: counts,
+      replyLengths: []
+    };
+  }
+
+  function renderMessagesFromHistory(history){
+    messagesEl.innerHTML = "";
+    appendMessage("assistant", GREETING);
+    (history || []).forEach(function(t){
+      appendMessage(t.role === "user" ? "user" : "assistant", t.content);
+    });
+  }
+
+  function applyCaseState(body){
+    turns = [buildSystemTurn(), {role:"assistant", content: GREETING}].concat(body.turns || []);
+    stats.msgCount = (body.stats && body.stats.msgCount) || 0;
+    stats.attachCount = (body.stats && body.stats.attachCount) || 0;
+    stats.charTotal = (body.stats && body.stats.charTotal) || 0;
+    replyLengths = (body.replyLengths || []).slice();
+    MODULES.forEach(function(m){
+      var count = (body.moduleTriggerCounts && body.moduleTriggerCounts[m.id]) || 0;
+      moduleTriggerCounts[m.id] = count;
+      var li = document.getElementById("mod-" + m.id);
+      var chip = document.getElementById("mchip-" + m.id);
+      var dot = document.getElementById("radarDot-" + m.id);
+      if(li){ li.classList.remove("active"); li.classList.toggle("used", count > 0); }
+      if(chip) chip.classList.toggle("used", count > 0);
+      if(dot){ dot.classList.remove("active"); dot.classList.toggle("lit", count > 0); }
+    });
+    renderMessagesFromHistory(body.turns);
+    renderStats();
+    renderSparkline();
+    renderBars();
+    updateRadarDots();
+  }
+
+  function saveCurrentCase(){
+    if(!casesColRef || !currentCaseId || loadingCase) return;
+    casesColRef.doc(currentCaseId).update({
+      turns: turns.slice(2),
+      stats: {msgCount:stats.msgCount, attachCount:stats.attachCount, charTotal:stats.charTotal},
+      moduleTriggerCounts: moduleTriggerCounts,
+      replyLengths: replyLengths,
+      updatedAt: new Date().toISOString()
+    }).catch(function(){ /* best-effort: local state stays correct even if this write failed */ });
+  }
+
+  /* ---------- per-case memory: case switcher ---------- */
+  function renderCaseOptions(list){
+    caseSelectEl.innerHTML = "";
+    list.forEach(function(c){
+      var opt = document.createElement("option");
+      opt.value = c.id;
+      opt.textContent = c.name || "未命名案件";
+      caseSelectEl.appendChild(opt);
+    });
+    if(currentCaseId) caseSelectEl.value = currentCaseId;
+  }
+
+  function loadCase(caseId, body){
+    currentCaseId = caseId;
+    loadingCase = true;
+    applyCaseState(body);
+    loadingCase = false;
+    caseSelectEl.value = caseId;
+    try{ window.localStorage.setItem("aegis-last-case", caseId); }catch(e){}
+  }
+
+  function switchToCase(caseId){
+    if(!casesColRef || !caseId || caseId === currentCaseId) return;
+    casesColRef.doc(caseId).get().then(function(snap){
+      if(!snap.exists) return;
+      loadCase(caseId, snap.data());
+    });
+  }
+
+  function createDefaultCaseIfNone(){
+    if(!casesColRef) return;
+    var body = freshCaseBody("預設案件");
+    casesColRef.add(body).then(function(ref){ loadCase(ref.id, body); });
+  }
+
+  /* Native window.prompt/confirm are unreliable inside the artifact's
+     sandboxed iframe (often silently blocked), so case naming/renaming
+     uses this inline editor instead, and delete uses an arm-then-confirm
+     click on its own button rather than a confirm() dialog. */
+  var caseEditorMode = null; /* "new" | "rename" */
+
+  function openCaseEditor(mode, prefill){
+    caseEditorMode = mode;
+    caseNameInputEl.value = prefill || "";
+    caseSwitcherEl.hidden = true;
+    caseEditorEl.hidden = false;
+    caseNameInputEl.focus();
+    caseNameInputEl.select();
+  }
+
+  function closeCaseEditor(){
+    caseEditorEl.hidden = true;
+    caseSwitcherEl.hidden = false;
+    caseEditorMode = null;
+  }
+
+  function commitCaseEditor(){
+    var name = caseNameInputEl.value.trim();
+    var mode = caseEditorMode;
+    closeCaseEditor();
+    if(!name || !casesColRef) return;
+    if(mode === "new"){
+      var body = freshCaseBody(name);
+      casesColRef.add(body).then(function(ref){ loadCase(ref.id, body); });
+    } else if(mode === "rename" && currentCaseId){
+      casesColRef.doc(currentCaseId).update({name: name, updatedAt: new Date().toISOString()});
+    }
+  }
+
+  function createNewCase(){
+    if(!casesColRef) return;
+    openCaseEditor("new", "");
+  }
+
+  function renameCurrentCase(){
+    if(!casesColRef || !currentCaseId) return;
+    var opt = caseSelectEl.querySelector('option[value="' + currentCaseId + '"]');
+    openCaseEditor("rename", opt ? opt.textContent : "");
+  }
+
+  var deleteArmed = false;
+  var deleteArmTimer = null;
+  function resetDeleteArm(){
+    deleteArmed = false;
+    window.clearTimeout(deleteArmTimer);
+    deleteCaseBtn.textContent = "🗑";
+    deleteCaseBtn.title = "刪除案件";
+    deleteCaseBtn.classList.remove("danger-armed");
+  }
+  function deleteCurrentCase(){
+    if(!casesColRef || !currentCaseId) return;
+    if(!deleteArmed){
+      deleteArmed = true;
+      deleteCaseBtn.textContent = "⚠";
+      deleteCaseBtn.title = "再按一次確認刪除（3 秒內）";
+      deleteCaseBtn.classList.add("danger-armed");
+      window.clearTimeout(deleteArmTimer);
+      deleteArmTimer = window.setTimeout(resetDeleteArm, 3000);
+      return;
+    }
+    resetDeleteArm();
+    casesColRef.doc(currentCaseId).delete();
+    currentCaseId = null;
+  }
+
+  function watchCases(){
+    unsubscribeCases = casesColRef.orderBy("updatedAt", "desc").onSnapshot(function(qs){
+      var list = qs.docs.map(function(d){ return {id: d.id, name: (d.data() || {}).name}; });
+      renderCaseOptions(list);
+      if(list.length === 0){
+        createDefaultCaseIfNone();
+        return;
+      }
+      var stillExists = list.some(function(c){ return c.id === currentCaseId; });
+      if(!currentCaseId || !stillExists){
+        var lastId = null;
+        try{ lastId = window.localStorage.getItem("aegis-last-case"); }catch(e){}
+        var remembered = list.filter(function(c){ return c.id === lastId; })[0];
+        switchToCase((remembered || list[0]).id);
+      }
+    }, function(){ /* live sync unavailable: switcher still works via manual actions */ });
+  }
+
+  caseSelectEl.addEventListener("change", function(){ switchToCase(caseSelectEl.value); });
+  newCaseBtn.addEventListener("click", createNewCase);
+  renameCaseBtn.addEventListener("click", renameCurrentCase);
+  deleteCaseBtn.addEventListener("click", deleteCurrentCase);
+  caseEditorConfirmBtn.addEventListener("click", commitCaseEditor);
+  caseEditorCancelBtn.addEventListener("click", closeCaseEditor);
+  caseNameInputEl.addEventListener("keydown", function(ev){
+    if(ev.key === "Enter"){ ev.preventDefault(); commitCaseEditor(); }
+    else if(ev.key === "Escape"){ ev.preventDefault(); closeCaseEditor(); }
+  });
+
+  /* ---------- sending ---------- */
+  function callSample(images){
+    busy = true;
+    setComposerEnabled(false);
+    showStop(true);
+    setCore("thinking");
+    var bubble = appendMessage("assistant", "", {pending:true});
+    controller = new AbortController();
+    var opts = {
+      modelTier: "default",
+      cache: false,
+      signal: controller.signal,
+      onText: function(u){ setCore("speaking"); setMessageText(bubble, u.text); }
+    };
+    if(images && images.length) opts.images = images;
+
+    sample(turns, opts).then(function(res){
+      turns.push({role:"assistant", content: res.text});
+      setMessageText(bubble, res.text);
+      detectModules(res.text);
+      stats.charTotal += res.text.length;
+      replyLengths.push(res.text.length);
+      if(replyLengths.length > MAX_SPARK_POINTS) replyLengths.shift();
+      renderSparkline();
+      renderStats();
+      saveCurrentCase();
+      if(res.truncated){
+        var note = document.createElement("div");
+        note.style.cssText = "margin-top:6px;font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);";
+        note.textContent = "（回覆被截斷，可以請它換小一點的範圍再問一次）";
+        bubble.appendChild(note);
+      }
+      speak(res.text);
+    }).catch(function(e){
+      handleError(e, bubble, images);
+    }).finally(function(){
+      busy = false;
+      if(granted) setComposerEnabled(true);
+      showStop(false);
+      setCore(granted ? "idle" : "offline");
+      controller = null;
+    });
+  }
+
+  function trimTurns(){
+    while(turns.length > 20){ turns.splice(2, 1); }
+  }
+
+  function sendMessage(rawText){
+    if(!sample || busy || !granted) return;
+    rawText = (rawText || "").trim();
+    var payload = buildAttachmentPayload();
+    if(!rawText && payload.textParts.length === 0 && payload.images.length === 0) return;
+
+    var fullText = rawText;
+    if(payload.textParts.length){
+      fullText = (rawText ? rawText + "\n\n" : "（請幫我看看以下附件內容）\n\n") + payload.textParts.join("\n\n");
+    }
+    var attachCountThisMsg = payload.images.length + payload.textParts.length;
+    clearAttachments();
+    if(window.speechSynthesis) window.speechSynthesis.cancel();
+
+    appendMessage("user", rawText || "（僅附件，請見下方檔案）", {attachments: payload.names});
+    turns.push({role:"user", content: fullText});
+    trimTurns();
+
+    stats.msgCount++;
+    stats.attachCount += attachCountThisMsg;
+    stats.charTotal += rawText.length;
+    renderStats();
+    saveCurrentCase();
+
+    callSample(payload.images);
+  }
+
+  form.addEventListener("submit", function(ev){
+    ev.preventDefault();
+    var text = input.value;
+    input.value = "";
+    sendMessage(text);
+  });
+
+  stopBtn.addEventListener("click", function(){
+    if(controller) controller.abort();
+  });
+
+  Array.prototype.forEach.call(examplesEl.querySelectorAll(".example-chip"), function(btn){
+    btn.addEventListener("click", function(){
+      if(busy || !granted) return;
+      sendMessage(btn.getAttribute("data-text"));
+    });
+  });
+
+  /* ---------- voice input ---------- */
+  var SpeechRecognitionImpl = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var recognition = null;
+  var listening = false;
+
+  function ensureRecognition(){
+    if(recognition) return recognition;
+    recognition = new SpeechRecognitionImpl();
+    recognition.lang = "zh-TW";
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    var baseText = "";
+    recognition.onstart = function(){
+      listening = true;
+      micBtn.classList.add("listening");
+      baseText = input.value ? input.value + " " : "";
+    };
+    recognition.onresult = function(ev){
+      var interim = "", final = "";
+      for(var i = ev.resultIndex; i < ev.results.length; i++){
+        var r = ev.results[i];
+        if(r.isFinal) final += r[0].transcript; else interim += r[0].transcript;
+      }
+      input.value = baseText + final + interim;
+    };
+    recognition.onerror = function(ev){
+      var permissionErrors = {"not-allowed":1, "service-not-allowed":1, "audio-capture":1};
+      if(permissionErrors[ev.error]){
+        noteComposer("此預覽環境無法取得麥克風權限，請改用手機／電腦系統內建的語音輸入鍵盤直接打字", 8000);
+      } else {
+        noteComposer("沒聽清楚，再試一次");
+      }
+    };
+    recognition.onend = function(){
+      listening = false;
+      micBtn.classList.remove("listening");
+    };
+    return recognition;
+  }
+
+  if(SpeechRecognitionImpl){
+    micBtn.hidden = false;
+    micBtn.addEventListener("click", function(){
+      var r = ensureRecognition();
+      if(listening){ r.stop(); return; }
+      try{ r.start(); } catch(err){ /* already started */ }
+    });
+  }
+
+  /* ---------- voice output ---------- */
+  function refreshVoices(){
+    voicesCache = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+  }
+  function pickZhVoice(){
+    /* Prefer Taiwan Mandarin, then Hong Kong (both Traditional-script, non-Mainland
+       accent); only fall back to a Mainland zh-CN voice if literally nothing else
+       Chinese is installed on the device — never pick zh-CN over zh-TW/zh-HK. */
+    var v = voicesCache.filter(function(v){ return /zh[-_]?TW/i.test(v.lang); })[0];
+    if(!v) v = voicesCache.filter(function(v){ return /zh[-_]?HK/i.test(v.lang); })[0];
+    if(!v) v = voicesCache.filter(function(v){ return /^zh/i.test(v.lang) && !/zh[-_]?CN/i.test(v.lang); })[0];
+    if(!v) v = voicesCache.filter(function(v){ return /^zh/i.test(v.lang); })[0];
+    return v || null;
+  }
+  function stripForSpeech(t){
+    return t.replace(/\*\*/g, "").replace(/^[-•]\s+/gm, "").replace(/\n{2,}/g, "\n");
+  }
+  function speak(text){
+    if(!speakEnabled || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    var u = new SpeechSynthesisUtterance(stripForSpeech(text));
+    var v = pickZhVoice();
+    if(v) u.voice = v;
+    u.lang = v ? v.lang : "zh-TW";
+    u.rate = 1;
+    window.speechSynthesis.speak(u);
+  }
+
+  if(window.speechSynthesis){
+    refreshVoices();
+    window.speechSynthesis.onvoiceschanged = refreshVoices;
+    speakToggle.hidden = false;
+    speakToggle.addEventListener("click", function(){
+      speakEnabled = !speakEnabled;
+      speakToggle.classList.toggle("on", speakEnabled);
+      if(!speakEnabled) window.speechSynthesis.cancel();
+    });
+  }
+
+  /* ---------- clock / session ---------- */
+  function tickClock(){
+    var d = new Date();
+    var hh = String(d.getHours()).padStart(2, "0");
+    var mm = String(d.getMinutes()).padStart(2, "0");
+    var ss = String(d.getSeconds()).padStart(2, "0");
+    clockEl.textContent = hh + ":" + mm + ":" + ss;
+  }
+  tickClock();
+  window.setInterval(tickClock, 1000);
+  sessionIdEl.textContent = "SESSION #" + Math.random().toString(16).slice(2, 6).toUpperCase();
+
+  /* ---------- init ---------- */
+  function goOffline(){
+    granted = false;
+    connLabel.textContent = "OFFLINE";
+    connDot.className = "dot warn";
+    mobileStatusPillEl.textContent = "離線";
+    setCore("offline");
+    setComposerEnabled(false);
+    input.placeholder = "此環境無法連接 AI 對話功能";
+  }
+
+  /* ---------- daily macro data bridge ----------
+     A separate scheduled Routine fetches the user's existing daily
+     macro-economic report and writes it into this artifact's db at
+     macro/today. If present, fold it into the system instructions so
+     AEGIS answers "今日總經摘要" with real, sourced numbers instead of
+     refusing (it has no other way to reach the open internet). Stored as
+     macroBlock (not spliced into turns[0] directly) so buildSystemTurn()
+     can freshly recompose the system prompt whenever a case (re)loads,
+     regardless of whether this resolves before or after that happens. */
+  function loadMacroContext(){
+    if(!db) return;
+    db.doc("macro/today").get().then(function(snap){
+      if(!snap.exists) return;
+      var data = snap.data();
+      if(!data || !data.text) return;
+      var todayStr = new Date().toISOString().slice(0, 10);
+      var isToday = data.date === todayStr;
+      var label = isToday
+        ? "以下是今天（" + data.date + "）已查證的總經晨報數據"
+        : "以下是最近一次（" + (data.date || "日期不明") + "，非今天）已查證的總經晨報數據，回答時請誠實註明日期，不要當成今天的數字";
+      macroBlock = "\n\n" + label + "（來源：每日總經晨報 Routine）：\n" + String(data.text).slice(0, 3000);
+      if(turns.length) turns[0] = buildSystemTurn();
+    }).catch(function(){ /* db unavailable in this view: silently skip, AEGIS falls back to saying it can't browse */ });
+  }
+
+  /* ---------- per-case memory: bring-up ----------
+     Independent of the sample capability: even if db is unavailable this
+     falls back cleanly to today's behavior (one unpersisted conversation,
+     the case switcher stays hidden). */
+  function initCases(){
+    if(!window.claude || typeof window.claude.use !== "function") return;
+    window.claude.use("db").then(function(d){
+      if(!d) return;
+      db = d;
+      casesColRef = db.collection("cases");
+      caseSwitcherEl.hidden = false;
+      loadMacroContext();
+      watchCases();
+    }).catch(function(){ /* no persistence available: stays a single in-memory conversation */ });
+  }
+
+  function init(){
+    renderStats();
+    renderSparkline();
+    updateRadarDots();
+    initCases();
+    if(!window.claude || typeof window.claude.use !== "function"){ goOffline(); return; }
+    window.claude.use("sample").then(function(fn){
+      sample = fn;
+      if(!sample){ goOffline(); return; }
+      connLabel.textContent = "ONLINE";
+      connDot.className = "dot on";
+      mobileStatusPillEl.textContent = "連線中";
+      setCore("idle");
+      sample.limits().then(function(l){ limitsCache = l; }).catch(function(){ limitsCache = null; });
+    }).catch(goOffline);
+  }
+  init();
+})();
+</script>
+</body>
+</html>
